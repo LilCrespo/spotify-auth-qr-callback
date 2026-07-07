@@ -36,9 +36,12 @@
 
         canvas {
             margin-top: 18px;
-            padding: 12px;
+            padding: 16px;
             border-radius: 10px;
             background: #ffffff;
+            max-width: 92vw;
+            height: auto;
+            image-rendering: pixelated;
         }
 
         code {
@@ -94,12 +97,14 @@
         }
 
         function drawQr(text) {
-            const qr = qrcodegen.QrCode.encodeText(text, qrcodegen.QrCode.Ecc.MEDIUM);
+            // LOW keeps the QR version smaller, which makes each module larger and
+            // easier for the Nintendo 3DS camera to read from a phone screen.
+            const qr = qrcodegen.QrCode.encodeText(text, qrcodegen.QrCode.Ecc.LOW);
             const canvas = document.getElementById("qr");
             const ctx = canvas.getContext("2d");
 
             const border = 4;
-            const scale = 6;
+            const scale = 8;
             const size = qr.size;
             const canvasSize = (size + border * 2) * scale;
 
@@ -141,13 +146,10 @@
             message.textContent = "No authorization code was found in the URL.";
             message.className = "error";
         } else {
-            const payload = JSON.stringify({
-                t: "spotify-auth-code",
-                c: code,
-                s: state || ""
-            });
+            // Compact payload: fewer characters = less dense QR = easier 3DS scan.
+            const payload = "c=" + encodeURIComponent(code) + "&s=" + encodeURIComponent(state || "");
 
-            message.textContent = "Authorization code received. Scan this QR code with your setup app.";
+            message.textContent = "Authorization code received. Set phone brightness high and scan this QR with your 3DS.";
             message.className = "ok";
 
             payloadBlock.textContent = payload;
