@@ -1,14 +1,14 @@
 <!doctype html>
-<html lang="en">
+<html lang="es">
 <head>
     <meta charset="utf-8">
-    <title>Spotify Auth QR Callback</title>
+    <title>Spotify 3DS Auth Callback</title>
     <meta name="viewport" content="width=device-width, initial-scale=1">
 
     <style>
         body {
             margin: 0;
-            padding: 24px;
+            padding: 18px;
             font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
             background: #101010;
             color: #ffffff;
@@ -16,9 +16,9 @@
         }
 
         .card {
-            max-width: 560px;
+            max-width: 680px;
             margin: 0 auto;
-            padding: 24px;
+            padding: 20px;
             border-radius: 18px;
             background: #1b1b1b;
             box-shadow: 0 8px 30px rgba(0, 0, 0, 0.35);
@@ -26,34 +26,49 @@
 
         h1 {
             margin-top: 0;
-            font-size: 26px;
+            font-size: 24px;
         }
 
         p {
-            line-height: 1.5;
+            line-height: 1.45;
             color: #dddddd;
         }
 
         canvas {
-            margin-top: 18px;
-            padding: 16px;
+            display: block;
+            margin: 16px auto 0;
+            padding: 10px;
             border-radius: 10px;
             background: #ffffff;
             max-width: 92vw;
             height: auto;
-            image-rendering: pixelated;
         }
 
         code {
             display: block;
-            margin-top: 18px;
-            padding: 12px;
+            margin-top: 14px;
+            padding: 10px;
             border-radius: 10px;
             background: #000000;
             color: #ffffff;
             word-break: break-all;
-            font-size: 13px;
+            font-size: 12px;
             text-align: left;
+        }
+
+        button {
+            margin: 14px 6px 0;
+            padding: 12px 18px;
+            border: 0;
+            border-radius: 999px;
+            font-size: 16px;
+            font-weight: 700;
+            color: #000000;
+            background: #1ed760;
+        }
+
+        button:disabled {
+            opacity: 0.4;
         }
 
         .ok {
@@ -69,42 +84,83 @@
             font-size: 13px;
             color: #aaaaaa;
         }
+
+        .step {
+            font-weight: 800;
+            color: #ffffff;
+        }
     </style>
 </head>
 
 <body>
     <div class="card">
-        <h1>Spotify Auth QR Callback</h1>
+        <h1>Spotify 3DS Auth Callback</h1>
 
-        <p id="message">Reading Spotify authorization response...</p>
+        <p id="message">Leyendo respuesta de Spotify...</p>
+        <p id="step" class="step" hidden></p>
 
         <canvas id="qr" hidden></canvas>
+
+        <div id="controls" hidden>
+            <button id="prev" type="button">Anterior</button>
+            <button id="next" type="button">Siguiente</button>
+        </div>
 
         <code id="payload" hidden></code>
 
         <p class="small">
-            This page does not store tokens, does not contact Spotify, and does not use a backend.
-            It only converts the authorization code into a QR code for your setup app.
+            Esta página no guarda tokens, no llama a Spotify y no usa backend.
+            Solo convierte el authorization code en varios QR pequeños para que la 3DS pueda leerlos.
         </p>
     </div>
 
     <script src="qrcodegen.js"></script>
 
     <script>
+        const CODE_CHUNK_SIZE = 48;
+
         function getQueryValue(name) {
             const params = new URLSearchParams(window.location.search);
             return params.get(name);
         }
 
+        function splitText(text, size) {
+            const chunks = [];
+            for (let i = 0; i < text.length; i += size) {
+                chunks.push(text.slice(i, i + size));
+            }
+            return chunks;
+        }
+
+        function makePayloads(code, state) {
+            const chunks = splitText(code, CODE_CHUNK_SIZE);
+            const payloads = [];
+
+            // QR 1: metadata only. Kept small so the 3DS can decode it reliably.
+            payloads.push({
+                title: "QR 1/" + (chunks.length + 1) + " - inicio",
+                help: "Escanea este primero con la 3DS. Después pulsa Siguiente en el móvil.",
+                text: "v=2&n=" + chunks.length + "&s=" + encodeURIComponent(state || "")
+            });
+
+            for (let i = 0; i < chunks.length; i++) {
+                payloads.push({
+                    title: "QR " + (i + 2) + "/" + (chunks.length + 1) + " - código " + (i + 1) + "/" + chunks.length,
+                    help: "Cuando la 3DS pida la parte " + (i + 1) + ", escanea este QR.",
+                    text: "i=" + (i + 1) + "&c=" + encodeURIComponent(chunks[i])
+                });
+            }
+
+            return payloads;
+        }
+
         function drawQr(text) {
-            // LOW keeps the QR version smaller, which makes each module larger and
-            // easier for the Nintendo 3DS camera to read from a phone screen.
             const qr = qrcodegen.QrCode.encodeText(text, qrcodegen.QrCode.Ecc.LOW);
             const canvas = document.getElementById("qr");
             const ctx = canvas.getContext("2d");
 
             const border = 4;
-            const scale = 8;
+            const scale = 10;
             const size = qr.size;
             const canvasSize = (size + border * 2) * scale;
 
@@ -137,25 +193,57 @@
         const error = getQueryValue("error");
 
         const message = document.getElementById("message");
+        const step = document.getElementById("step");
         const payloadBlock = document.getElementById("payload");
+        const controls = document.getElementById("controls");
+        const prevButton = document.getElementById("prev");
+        const nextButton = document.getElementById("next");
 
-        if (error) {
-            message.textContent = "Spotify returned an error: " + error;
-            message.className = "error";
-        } else if (!code) {
-            message.textContent = "No authorization code was found in the URL.";
-            message.className = "error";
-        } else {
-            // Compact payload: fewer characters = less dense QR = easier 3DS scan.
-            const payload = "c=" + encodeURIComponent(code) + "&s=" + encodeURIComponent(state || "");
+        let payloads = [];
+        let current = 0;
 
-            message.textContent = "Authorization code received. Set phone brightness high and scan this QR with your 3DS.";
+        function renderCurrent() {
+            const item = payloads[current];
+
+            step.textContent = item.title;
+            step.hidden = false;
+
+            message.textContent = item.help;
             message.className = "ok";
 
-            payloadBlock.textContent = payload;
+            payloadBlock.textContent = item.text;
             payloadBlock.hidden = false;
 
-            drawQr(payload);
+            prevButton.disabled = current === 0;
+            nextButton.disabled = current === payloads.length - 1;
+
+            drawQr(item.text);
+        }
+
+        prevButton.addEventListener("click", () => {
+            if (current > 0) {
+                current--;
+                renderCurrent();
+            }
+        });
+
+        nextButton.addEventListener("click", () => {
+            if (current < payloads.length - 1) {
+                current++;
+                renderCurrent();
+            }
+        });
+
+        if (error) {
+            message.textContent = "Spotify devolvió un error: " + error;
+            message.className = "error";
+        } else if (!code) {
+            message.textContent = "No se encontró authorization code en la URL.";
+            message.className = "error";
+        } else {
+            payloads = makePayloads(code, state || "");
+            controls.hidden = false;
+            renderCurrent();
         }
     </script>
 </body>
