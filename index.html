@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="es">
+<html lang="en">
 <head>
     <meta charset="utf-8">
     <title>Spotify 3DS Auth Callback</title>
@@ -96,21 +96,21 @@
     <div class="card">
         <h1>Spotify 3DS Auth Callback</h1>
 
-        <p id="message">Leyendo respuesta de Spotify...</p>
+        <p id="message">Reading Spotify response...</p>
         <p id="step" class="step" hidden></p>
 
         <canvas id="qr" hidden></canvas>
 
         <div id="controls" hidden>
-            <button id="prev" type="button">Anterior</button>
-            <button id="next" type="button">Siguiente</button>
+            <button id="prev" type="button">Previous</button>
+            <button id="next" type="button">Next</button>
         </div>
 
         <code id="payload" hidden></code>
 
         <p class="small">
-            Esta página no guarda tokens, no llama a Spotify y no usa backend.
-            Solo convierte el authorization code en varios QR pequeños para que la 3DS pueda leerlos.
+            This page does not store tokens, call Spotify, or use a backend.
+            It only converts the authorization code into multiple small QR codes so the 3DS can read them.
         </p>
     </div>
 
@@ -138,15 +138,15 @@
 
             // QR 1: metadata only. Kept small so the 3DS can decode it reliably.
             payloads.push({
-                title: "QR 1/" + (chunks.length + 1) + " - inicio",
-                help: "Escanea este primero con la 3DS. Después pulsa Siguiente en el móvil.",
+                title: "QR 1/" + (chunks.length + 1) + " - start",
+                help: "Scan this one first with the 3DS. Then tap Next on your phone.",
                 text: "v=2&n=" + chunks.length + "&s=" + encodeURIComponent(state || "")
             });
 
             for (let i = 0; i < chunks.length; i++) {
                 payloads.push({
-                    title: "QR " + (i + 2) + "/" + (chunks.length + 1) + " - código " + (i + 1) + "/" + chunks.length,
-                    help: "Cuando la 3DS pida la parte " + (i + 1) + ", escanea este QR.",
+                    title: "QR " + (i + 2) + "/" + (chunks.length + 1) + " - code part " + (i + 1) + "/" + chunks.length,
+                    help: "When the 3DS asks for part " + (i + 1) + ", scan this QR code.",
                     text: "i=" + (i + 1) + "&c=" + encodeURIComponent(chunks[i])
                 });
             }
@@ -235,10 +235,10 @@
         });
 
         if (error) {
-            message.textContent = "Spotify devolvió un error: " + error;
+            message.textContent = "Spotify returned an error: " + error;
             message.className = "error";
         } else if (!code) {
-            message.textContent = "No se encontró authorization code en la URL.";
+            message.textContent = "No authorization code was found in the URL.";
             message.className = "error";
         } else {
             payloads = makePayloads(code, state || "");
