@@ -7,3 +7,7 @@ Spotify Dashboard Redirect URI:
 ```text
 https://lilcrespo.github.io/spotify-auth-qr-callback/
 ```
+
+## License
+
+MIT License. See `LICENSE` for details.
